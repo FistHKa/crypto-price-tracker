@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16
+    container_name: crypto_price_tracker_test_db
+    env_file: .env
+
+    environment:
+      POSTGRES_DB: ${TEST_DB_NAME}
+
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${TEST_DB_NAME}" ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  tests:
+    build: .
+    container_name: crypto_price_tracker_tests
+
+    env_file: .env
+
+    environment:
+      DATABASE_URL: ${TEST_DATABASE_URL}
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - .:/app
+
+    command: >
+      bash -lc "
+        alembic upgrade head &&
+        pytest -q || exit 1
+      " 
+
+volumes:
+  pgdata_test:

@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Mypy / linters
+.mypy_cache/
+.ruff_cache/
+
+# Environment variables
+.env
+.env.*
+
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+pgdata/
+pgdata_test/
+*.log
+
+# Celery
+celerybeat-schedule
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

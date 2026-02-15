@@ -1,0 +1,85 @@
+services:
+  # ---------------- DATABASE ----------------
+  db:
+    image: postgres:16
+    container_name: crypto_price_tracker_db
+    env_file: .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # ---------------- REDIS ----------------
+  redis:
+    image: redis:7-alpine
+    container_name: crypto_price_tracker_redis
+    ports:
+      - "6379:6379"
+
+  # ---------------- MIGRATIONS (ONE-SHOT) ----------------
+  migrate:
+    build: .
+    container_name: crypto_price_tracker_migrate
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      bash -c "
+        echo 'Waiting for database...' &&
+        alembic upgrade head &&
+        echo 'Migrations applied successfully!'
+      "
+    restart: "no"
+
+  # ---------------- API ----------------
+  api:
+    build: .
+    container_name: crypto_price_tracker_api
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "info" ]
+
+  # ---------------- WORKER ----------------
+  worker:
+    build: .
+    container_name: crypto_price_tracker_worker
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: [ "celery", "-A", "app.celery_app:celery_app", "worker", "-l", "INFO" ]
+
+  # ---------------- SCHEDULER ----------------
+  beat:
+    build: .
+    container_name: crypto_price_tracker_beat
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: [ "celery", "-A", "app.celery_app:celery_app", "beat", "-l", "INFO", "--schedule", "/tmp/celerybeat-schedule" ]
+
+volumes:
+  pgdata:
